@@ -19,5 +19,3 @@ if db.countries.find({'name': country_name}):
 else:
     print('You have that one already!')
     pprint.pprint(db.countries.find_one({'name': country_name}))
-
-print 'cokolwiek'
