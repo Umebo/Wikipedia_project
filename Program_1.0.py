@@ -28,27 +28,29 @@ def flag_name_from_path(path):
 
 def comparing_flags(input_flag):
     difference = 30.0
+    most_similar_flag = ''
     for file in glob.glob('Flags/*.png'):
         test_flag = Image.open(file).resize(input_flag.size).convert('RGB')
         percentage = imgcompare.image_diff_percent(test_flag, input_flag)
         if percentage < difference:
-            result = (flag_name_from_path(file))
-    return result
+            most_similar_flag = (flag_name_from_path(file))
+            difference = percentage
+    return most_similar_flag
 
 
-def phrase_with_tag(country_name, tag):
-    whole_text = TextBlob(db.countries.find_one({'name': country_name})['Summary']).sentences
+def phrase_with_tag(country, tagged_word):
+    whole_text = TextBlob(db.countries.find_one({'name': country})['Summary']).sentences
     tagged_phrases = []
-    for phrase in whole_text:
-        if phrase.find(tag) != -1:
-            phrase = str(phrase)
-            tagged_phrases.append(phrase)
+    for sentence in whole_text:
+        if sentence.find(tagged_word) != -1:
+            sentence = str(sentence)
+            tagged_phrases.append(sentence)
     return tagged_phrases
 
 
 ##################################################################
 
-flag = Image.open('flag.png').convert('RGB')
+# flag = Image.open('flag.png').convert('RGB')
 
 country_input = input(' Select country: ')
 country_name = wikipedia.WikipediaPage(country_input).title
@@ -62,6 +64,8 @@ if country_name != '' and tag == '':
     else:
         print('You have that one already!')
         pprint.pprint((db.countries.find_one({'name': country_name}))['Summary'])
+elif country_name != '' and tag == 'getflag':
+    print('https://en.wikipedia.org/wiki/File:Flag_of_' + country_name + '.svg')
 elif country_name != '' and tag != '':
     if db.countries.find({'name': country_name}).count() == 0:
         saving_country_to_db(country_input)
@@ -72,3 +76,6 @@ elif country_name != '' and tag != '':
         data = phrase_with_tag(country_name, tag)
         for phrase in data:
             print(phrase)
+elif country_name == '' and tag != '':
+
+
