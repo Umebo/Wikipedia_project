@@ -1,5 +1,6 @@
 import wikipedia
 import pprint
+import requests
 from PIL import Image
 from textblob import TextBlob
 import glob
@@ -39,9 +40,9 @@ def comparing_flags(input_flag):
 
 
 def phrase_with_tag(country, tagged_word):
-    whole_text = TextBlob(db.countries.find_one({'name': country})['Summary']).sentences
+    whole_country_summary = TextBlob(db.countries.find_one({'name': country})['Summary']).sentences
     tagged_phrases = []
-    for sentence in whole_text:
+    for sentence in whole_country_summary:
         if sentence.find(tagged_word) != -1:
             sentence = str(sentence)
             tagged_phrases.append(sentence)
@@ -50,32 +51,26 @@ def phrase_with_tag(country, tagged_word):
 
 ##################################################################
 
-# flag = Image.open('flag.png').convert('RGB')
-
-country_input = input(' Select country: ')
-country_name = wikipedia.WikipediaPage(country_input).title
-tag = input(' Lookin\' for sth specific? ')
-
-
-if country_name != '' and tag == '':
-    if db.countries.find({'name': country_name}).count() == 0:
-        saving_country_to_db(country_input)
-        pprint.pprint((db.countries.find_one({'name': country_name}))['Summary'])
-    else:
-        print('You have that one already!')
-        pprint.pprint((db.countries.find_one({'name': country_name}))['Summary'])
-elif country_name != '' and tag == 'getflag':
-    print('https://en.wikipedia.org/wiki/File:Flag_of_' + country_name + '.svg')
-elif country_name != '' and tag != '':
-    if db.countries.find({'name': country_name}).count() == 0:
-        saving_country_to_db(country_input)
-        data = phrase_with_tag(country_name, tag)
-        for phrase in data:
-            print(phrase)
-    else:
-        data = phrase_with_tag(country_name, tag)
-        for phrase in data:
-            print(phrase)
-elif country_name == '' and tag != '':
-
-
+while True:
+    country_input = input(' Select country: ')
+    country_name = wikipedia.WikipediaPage(country_input).title
+    tag = input(' Lookin\' for sth specific? ')
+    if country_name != '' and tag == '':
+        if db.countries.find({'name': country_name}).count() == 0:
+            saving_country_to_db(country_input)
+            pprint.pprint((db.countries.find_one({'name': country_name}))['Summary'])
+        else:
+            print('You have that one already!')
+            pprint.pprint((db.countries.find_one({'name': country_name}))['Summary'])
+    elif country_name != '' and tag == 'getflag':
+        print('https://en.wikipedia.org/wiki/File:Flag_of_' + country_name + '.svg')
+    elif country_name != '' and tag != '':
+        if db.countries.find({'name': country_name}).count() == 0:
+            saving_country_to_db(country_input)
+            data = phrase_with_tag(country_name, tag)
+            for phrase in data:
+                print(phrase)
+        else:
+            data = phrase_with_tag(country_name, tag)
+            for phrase in data:
+                print(phrase)
