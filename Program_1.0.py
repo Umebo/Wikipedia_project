@@ -1,6 +1,8 @@
 import wikipedia
 import pprint
 import requests
+import json
+from http.server import BaseHTTPRequestHandler, HTTPServer
 from PIL import Image
 from textblob import TextBlob
 import glob
@@ -10,6 +12,29 @@ from pymongo import MongoClient
 # Podlaczenie do lokalnej bazy danych
 client = MongoClient()
 db = client.countries
+
+host_name = 'localhost'
+post_number = 9901
+
+
+class WikiHandler(BaseHTTPRequestHandler):
+    def do_POST(self):
+        self.send_response(200)
+        self.end_headers()
+        input_data = '{' + (self.path.replace('%22','"').replace('%20',' ').replace('%7D',',').replace('%7B',': '))[8::] + '}'
+        input_data_dict = eval(input_data)
+        print(input_data_dict)
+        print(input_data_dict['content'])
+
+
+def run():
+    server_address = ('localhost', 9901)
+    httpd = HTTPServer(server_address, WikiHandler)
+    try:
+        httpd.serve_forever()
+    except KeyboardInterrupt:
+        pass
+    httpd.server_close()
 
 
 def saving_country_to_db(input_country):
@@ -50,7 +75,7 @@ def phrase_with_tag(country, tagged_word):
 
 
 ##################################################################
-
+"""
 while True:
     country_input = input(' Select country: ')
     country_name = wikipedia.WikipediaPage(country_input).title
@@ -74,3 +99,7 @@ while True:
             data = phrase_with_tag(country_name, tag)
             for phrase in data:
                 print(phrase)
+"""
+
+
+run()
