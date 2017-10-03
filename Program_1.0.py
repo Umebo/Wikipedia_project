@@ -3,6 +3,7 @@ import pprint
 import requests
 import json
 import re
+import urllib.request
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from PIL import Image
 from textblob import TextBlob
@@ -22,7 +23,7 @@ class WikiHandler(BaseHTTPRequestHandler):
     def do_POST(self):
         self.send_response(200)
         self.end_headers()
-        input_data = eval('{' + (self.path.replace('%22','"').replace('%20',' ').replace('%7D',',').replace('%7B',': '))[8::] + '}')
+        input_data = eval('{' + (self.path.replace('%22', '"').replace('%20', ' ').replace('%7D', ',').replace('%7B', ': '))[8::] + '}')
         input_data_content = input_data['content']
 
         if input_data_content.find('country') != -1 and input_data_content.find('tag') != -1:
@@ -55,7 +56,9 @@ class WikiHandler(BaseHTTPRequestHandler):
         elif input_data_content.find('checkflag') != -1:
             link_to_flag = re.search('checkflag\((.*)\)', input_data_content)
             link_to_flag = link_to_flag.group(1)
-            print(link_to_flag)
+            urllib.request.urlretrieve(link_to_flag, 'flag.png')
+            flag = Image.open('flag.png').convert('RGB')
+            print(comparing_flags(flag))
 
 
 def run():
@@ -106,32 +109,6 @@ def phrase_with_tag(country, tagged_word):
     return tagged_phrases
 
 
-##################################################################
-"""
-while True:
-    country_input = input(' Select country: ')
-    country_name = wikipedia.WikipediaPage(country_input).title
-    tag = input(' Lookin\' for sth specific? ')
-    if country_name != '' and tag == '':
-        if db.countries.find({'name': country_name}).count() == 0:
-            saving_country_to_db(country_input)
-            pprint.pprint((db.countries.find_one({'name': country_name}))['Summary'])
-        else:
-            print('You have that one already!')
-            pprint.pprint((db.countries.find_one({'name': country_name}))['Summary'])
-    elif country_name != '' and tag == 'getflag':
-        print('https://en.wikipedia.org/wiki/File:Flag_of_' + country_name + '.svg')
-    elif country_name != '' and tag != '':
-        if db.countries.find({'name': country_name}).count() == 0:
-            saving_country_to_db(country_input)
-            data = phrase_with_tag(country_name, tag)
-            for phrase in data:
-                print(phrase)
-        else:
-            data = phrase_with_tag(country_name, tag)
-            for phrase in data:
-                print(phrase)
-"""
-
+#################################################################
 
 run()
