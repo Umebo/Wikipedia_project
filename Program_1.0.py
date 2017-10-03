@@ -2,6 +2,7 @@ import wikipedia
 import pprint
 import requests
 import json
+import re
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from PIL import Image
 from textblob import TextBlob
@@ -21,10 +22,40 @@ class WikiHandler(BaseHTTPRequestHandler):
     def do_POST(self):
         self.send_response(200)
         self.end_headers()
-        input_data = '{' + (self.path.replace('%22','"').replace('%20',' ').replace('%7D',',').replace('%7B',': '))[8::] + '}'
-        input_data_dict = eval(input_data)
-        print(input_data_dict)
-        print(input_data_dict['content'])
+        input_data = eval('{' + (self.path.replace('%22','"').replace('%20',' ').replace('%7D',',').replace('%7B',': '))[8::] + '}')
+        input_data_content = input_data['content']
+
+        if input_data_content.find('country') != -1 and input_data_content.find('tag') != -1:
+            country_name = re.search('country\((.*)\);', input_data_content)
+            country_name = country_name.group(1)
+            tag = re.search('tag\((.*)\)', input_data_content)
+            tag = tag.group(1)
+            if db.countries.find({'name': country_name}).count() == 0:
+                saving_country_to_db(country_name)
+                data = phrase_with_tag(country_name, tag)
+                for phrase in data:
+                    print(phrase)
+            else:
+                data = phrase_with_tag(country_name, tag)
+                for phrase in data:
+                    print(phrase)
+        elif input_data_content.find('country') != -1 and input_data_content.find('getflag') != -1:
+            country_name = re.search('country\((.*)\)', input_data_content)
+            country_name = country_name.group(1)
+            print('https://en.wikipedia.org/wiki/File:Flag_of_' + country_name + '.svg')
+        elif input_data_content.find('country') != -1:
+            country_name = re.search('country\((.*)\)', input_data_content)
+            country_name = country_name.group(1)
+            if db.countries.find({'name': country_name}).count() == 0:
+                saving_country_to_db(country_name)
+                pprint.pprint((db.countries.find_one({'name': country_name}))['Summary'])
+            else:
+                print('You have that one already!')
+                pprint.pprint((db.countries.find_one({'name': country_name}))['Summary'])
+        elif input_data_content.find('checkflag') != -1:
+            link_to_flag = re.search('checkflag\((.*)\)', input_data_content)
+            link_to_flag = link_to_flag.group(1)
+            print(link_to_flag)
 
 
 def run():
@@ -38,6 +69,7 @@ def run():
 
 
 def saving_country_to_db(input_country):
+    country_name = input_country
     country = wikipedia.WikipediaPage(input_country).summary
     country_data = {'name': country_name, 'Summary': country}
     db.countries.insert_one(country_data)
