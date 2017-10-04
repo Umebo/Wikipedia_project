@@ -25,40 +25,7 @@ class WikiHandler(BaseHTTPRequestHandler):
         self.end_headers()
         input_data = eval('{' + (self.path.replace('%22', '"').replace('%20', ' ').replace('%7D', ',').replace('%7B', ': '))[8::] + '}')
         input_data_content = input_data['content']
-
-        if input_data_content.find('country') != -1 and input_data_content.find('tag') != -1:
-            country_name = re.search('country\((.*)\);', input_data_content)
-            country_name = country_name.group(1)
-            tag = re.search('tag\((.*)\)', input_data_content)
-            tag = tag.group(1)
-            if db.countries.find({'name': country_name}).count() == 0:
-                saving_country_to_db(country_name)
-                data = phrase_with_tag(country_name, tag)
-                for phrase in data:
-                    print(phrase)
-            else:
-                data = phrase_with_tag(country_name, tag)
-                for phrase in data:
-                    print(phrase)
-        elif input_data_content.find('country') != -1 and input_data_content.find('getflag') != -1:
-            country_name = re.search('country\((.*)\)', input_data_content)
-            country_name = country_name.group(1)
-            print('https://en.wikipedia.org/wiki/File:Flag_of_' + country_name + '.svg')
-        elif input_data_content.find('country') != -1:
-            country_name = re.search('country\((.*)\)', input_data_content)
-            country_name = country_name.group(1)
-            if db.countries.find({'name': country_name}).count() == 0:
-                saving_country_to_db(country_name)
-                pprint.pprint((db.countries.find_one({'name': country_name}))['Summary'])
-            else:
-                print('You have that one already!')
-                pprint.pprint((db.countries.find_one({'name': country_name}))['Summary'])
-        elif input_data_content.find('checkflag') != -1:
-            link_to_flag = re.search('checkflag\((.*)\)', input_data_content)
-            link_to_flag = link_to_flag.group(1)
-            urllib.request.urlretrieve(link_to_flag, 'flag.png')
-            flag = Image.open('flag.png').convert('RGB')
-            print(comparing_flags(flag))
+        print(downloading_content(input_data_content))
 
 
 def run():
@@ -71,11 +38,31 @@ def run():
     httpd.server_close()
 
 
+def key_words_from_content(content):
+    if content.find('tag') != -1:
+        country_name = re.search('country\((.*)\);', content).group(1)
+        return country_name
+    elif content.find('checkflag') != -1:
+        link_to_flag = re.search('checkflag\((.*)\)', content).group(1)
+        return link_to_flag
+    else:
+        country_name = re.search('country\((.*)\)', content).group(1)
+        return country_name
+
+
 def saving_country_to_db(input_country):
     country_name = input_country
     country = wikipedia.WikipediaPage(input_country).summary
     country_data = {'name': country_name, 'Summary': country}
     db.countries.insert_one(country_data)
+
+
+def whole_country_summary(input_country):
+    if db.countries.find({'name': input_country}).count() == 0:
+        saving_country_to_db(input_country)
+    else:
+        print('You have that one already!')
+    return (db.countries.find_one({'name': input_country}))['Summary']
 
 
 def flag_name_from_path(path):
@@ -100,14 +87,32 @@ def comparing_flags(input_flag):
 
 
 def phrase_with_tag(country, tagged_word):
+    if db.countries.find({'name': country}).count() == 0:
+        saving_country_to_db(country)
     whole_country_summary = TextBlob(db.countries.find_one({'name': country})['Summary']).sentences
     tagged_phrases = []
     for sentence in whole_country_summary:
         if sentence.find(tagged_word) != -1:
             sentence = str(sentence)
             tagged_phrases.append(sentence)
-    return tagged_phrases
+    for phrase in tagged_phrases:
+        return phrase
 
+
+def downloading_content(chosen_data):
+    country_name = key_words_from_content(chosen_data)
+    if chosen_data.find('tag') != -1:
+        tag = re.search('tag\((.*)\)', chosen_data)
+        tag = tag.group(1)
+        return phrase_with_tag(country_name, tag)
+    elif chosen_data.find('getflag') != -1:
+        return 'https://en.wikipedia.org/wiki/File:Flag_of_' + country_name + '.svg'
+    elif chosen_data.find('country') != -1:
+        return pprint.pprint(whole_country_summary(country_name))
+    elif chosen_data.find('checkflag') != -1:
+        urllib.request.urlretrieve(country_name, 'flag.png')
+        flag = Image.open('flag.png').convert('RGB')
+        return comparing_flags(flag)
 
 #################################################################
 
