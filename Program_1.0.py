@@ -1,21 +1,66 @@
 import wikipedia
 import pprint
-import requests
-from PIL import Image
-from textblob import TextBlob
+import re
+import urllib.request
 import glob
 import imgcompare
+from http.server import BaseHTTPRequestHandler, HTTPServer
+from PIL import Image
+from textblob import TextBlob
 from pymongo import MongoClient
 
-# Podlaczenie do lokalnej bazy danych
+# Loggin' to the local database
 client = MongoClient()
 db = client.countries
 
+host_name = 'localhost'
+post_number = 9901
 
+
+class WikiHandler(BaseHTTPRequestHandler):
+    def do_POST(self):
+        self.send_response(200)
+        self.end_headers()
+        input_data = eval('{' + (self.path.replace('%22', '"').replace('%20', ' ')
+                          .replace('%7D', ',').replace('%7B', ': '))[8::] + '}')
+        input_data_content = input_data['content']
+        pprint.pprint(downloading_content(input_data_content))
+
+
+def run():
+    server_address = ('localhost', 9901)
+    httpd = HTTPServer(server_address, WikiHandler)
+    try:
+        httpd.serve_forever()
+    except KeyboardInterrupt:
+        pass
+    httpd.server_close()
+
+
+# Searching for country name in request
+def country_name_from_content(content):
+    if content.find('tag') != -1:
+        return re.search('country\((.*)\);', content).group(1)
+    elif content.find('checkflag') != -1:
+        return re.search('checkflag\((.*)\)', content).group(1)
+    else:
+        return re.search('country\((.*)\)', content).group(1)
+
+
+# Saving article summary to local database
 def saving_country_to_db(input_country):
     country = wikipedia.WikipediaPage(input_country).summary
-    country_data = {'name': country_name, 'Summary': country}
+    country_data = {'name': input_country, 'Summary': country}
     db.countries.insert_one(country_data)
+
+
+# Checking if chosen summary is already in local database
+def whole_country_summary(input_country):
+    if db.countries.find({'name': input_country}).count() == 0:
+        saving_country_to_db(input_country)
+    else:
+        print('You have that one already!')
+    return (db.countries.find_one({'name': input_country}))['Summary']
 
 
 def flag_name_from_path(path):
@@ -39,38 +84,38 @@ def comparing_flags(input_flag):
     return most_similar_flag
 
 
+def checkflag_option(flag_name):
+    urllib.request.urlretrieve(flag_name, 'flag.png')
+    flag = Image.open('flag.png').convert('RGB')
+    return comparing_flags(flag)
+
+
+# Checking if summary exist, and then searching for tagged word
 def phrase_with_tag(country, tagged_word):
-    whole_country_summary = TextBlob(db.countries.find_one({'name': country})['Summary']).sentences
+    if db.countries.find({'name': country}).count() == 0:
+        saving_country_to_db(country)
     tagged_phrases = []
-    for sentence in whole_country_summary:
+    for sentence in TextBlob(db.countries.find_one({'name': country})['Summary']).sentences:
         if sentence.find(tagged_word) != -1:
-            sentence = str(sentence)
-            tagged_phrases.append(sentence)
+            tagged_phrases.append(str(sentence))
     return tagged_phrases
 
 
-##################################################################
+def downloading_content(chosen_data):
+    country_name = country_name_from_content(chosen_data)
+    if chosen_data.find('tag') != -1:
+        tag = re.search('tag\((.*)\)', chosen_data).group(1)
+        return phrase_with_tag(country_name, tag)
+    elif chosen_data.find('getflag') != -1:
+        return 'https://en.wikipedia.org/wiki/File:Flag_of_' + country_name + '.svg'
+    elif chosen_data.find('country') != -1:
+        return whole_country_summary(country_name)
+    elif chosen_data.find('checkflag') != -1:
+        return checkflag_option(country_name)
+    else:
+        print('Something went wrong.')
 
-while True:
-    country_input = input(' Select country: ')
-    country_name = wikipedia.WikipediaPage(country_input).title
-    tag = input(' Lookin\' for sth specific? ')
-    if country_name != '' and tag == '':
-        if db.countries.find({'name': country_name}).count() == 0:
-            saving_country_to_db(country_input)
-            pprint.pprint((db.countries.find_one({'name': country_name}))['Summary'])
-        else:
-            print('You have that one already!')
-            pprint.pprint((db.countries.find_one({'name': country_name}))['Summary'])
-    elif country_name != '' and tag == 'getflag':
-        print('https://en.wikipedia.org/wiki/File:Flag_of_' + country_name + '.svg')
-    elif country_name != '' and tag != '':
-        if db.countries.find({'name': country_name}).count() == 0:
-            saving_country_to_db(country_input)
-            data = phrase_with_tag(country_name, tag)
-            for phrase in data:
-                print(phrase)
-        else:
-            data = phrase_with_tag(country_name, tag)
-            for phrase in data:
-                print(phrase)
+
+#################################################################
+
+run()
