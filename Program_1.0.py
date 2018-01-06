@@ -1,17 +1,15 @@
 import wikipedia
 import pprint
-import requests
-import json
 import re
 import urllib.request
+import glob
+import imgcompare
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from PIL import Image
 from textblob import TextBlob
-import glob
-import imgcompare
 from pymongo import MongoClient
 
-# Podlaczenie do lokalnej bazy danych
+# Loggin' to the local database
 client = MongoClient()
 db = client.countries
 
@@ -24,7 +22,7 @@ class WikiHandler(BaseHTTPRequestHandler):
         self.send_response(200)
         self.end_headers()
         input_data = eval('{' + (self.path.replace('%22', '"').replace('%20', ' ')
-                                 .replace('%7D', ',').replace('%7B', ': '))[8::] + '}')
+                          .replace('%7D', ',').replace('%7B', ': '))[8::] + '}')
         input_data_content = input_data['content']
         pprint.pprint(downloading_content(input_data_content))
 
@@ -39,6 +37,7 @@ def run():
     httpd.server_close()
 
 
+# Searching for country name in request
 def country_name_from_content(content):
     if content.find('tag') != -1:
         return re.search('country\((.*)\);', content).group(1)
@@ -48,12 +47,14 @@ def country_name_from_content(content):
         return re.search('country\((.*)\)', content).group(1)
 
 
+# Saving article summary to local database
 def saving_country_to_db(input_country):
     country = wikipedia.WikipediaPage(input_country).summary
     country_data = {'name': input_country, 'Summary': country}
     db.countries.insert_one(country_data)
 
 
+# Checking if chosen summary is already in local database
 def whole_country_summary(input_country):
     if db.countries.find({'name': input_country}).count() == 0:
         saving_country_to_db(input_country)
@@ -83,6 +84,13 @@ def comparing_flags(input_flag):
     return most_similar_flag
 
 
+def checkflag_option(flag_name):
+    urllib.request.urlretrieve(flag_name, 'flag.png')
+    flag = Image.open('flag.png').convert('RGB')
+    return comparing_flags(flag)
+
+
+# Checking if summary exist, and then searching for tagged word
 def phrase_with_tag(country, tagged_word):
     if db.countries.find({'name': country}).count() == 0:
         saving_country_to_db(country)
@@ -103,9 +111,7 @@ def downloading_content(chosen_data):
     elif chosen_data.find('country') != -1:
         return whole_country_summary(country_name)
     elif chosen_data.find('checkflag') != -1:
-        urllib.request.urlretrieve(country_name, 'flag.png')
-        flag = Image.open('flag.png').convert('RGB')
-        return comparing_flags(flag)
+        return checkflag_option(country_name)
     else:
         print('Something went wrong.')
 
